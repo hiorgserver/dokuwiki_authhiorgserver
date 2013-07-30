@@ -10,7 +10,9 @@
 if(!defined('DOKU_INC')) die();
 
 class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
-
+    
+    private $ssourl = "";
+    private $data = array();
 
     /**
      * Constructor.
@@ -29,11 +31,16 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         $this->cando['getUserCount']= false; // can the number of users be retrieved?
         $this->cando['getGroups']   = false; // can a list of available groups be retrieved?
         $this->cando['logout']      = true; // can the user logout again? (eg. not possible with HTTP auth)
-
-        // FIXME set capabilities accordingly
         $this->cando['external']    = true; // does the module do external auth checking?
 
-        // FIXME intialize your auth system and set success to true, if successful
+        $this->ssourl = $this->getConf('ssourl');
+        $ov = $this->getConf('ov');
+        if(!empty($ov)) {
+            $sep = (strpos($this->ssourl,"?") === false) ? "?" : "&";
+            $this->ssourl .= $sep . "ov=" . $ov;
+        }
+        $this->data = array();
+        
         $this->success = true;
     }
 
@@ -55,30 +62,87 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
      */
     public function trustExternal($user, $pass, $sticky = false) {
         
-        // FIXME implement
-        return false;
+        $this->data = $this->loadUserInfoFromSession();
         
-        /* some example:
-
-        global $USERINFO;
-        global $conf;
-        $sticky ? $sticky = true : $sticky = false; //sanity check
-
-        // do the checking here
-
-        // set the globals if authed
-        $USERINFO['name'] = 'FIXME';
-        $USERINFO['mail'] = 'FIXME';
-        $USERINFO['grps'] = array('FIXME');
-        $_SERVER['REMOTE_USER'] = $user;
-        $_SESSION[DOKU_COOKIE]['auth']['user'] = $user;
-        $_SESSION[DOKU_COOKIE]['auth']['pass'] = $pass;
-        $_SESSION[DOKU_COOKIE]['auth']['info'] = $USERINFO;
+        if (!empty($this->data)) {
+            $this->setGlobalConfig();
+            return;
+        }
+        
+        $this->processSSO();
+        
+        $this->setGlobalConfig();
+        $this->saveUserInfoToSession();
+        
         return true;
-
-        */
     }
 
+    function processSSO() {
+        // FIXME: ask hiorg-server...
+        $daten = array("name"=>"Hansi", "vorname"=>"Tester", "username"=>"loginname", "email"=>"test@test.de", "user_id"=>"abcde12345", "ov"=>"hos");
+        
+        $this->data = array("uid"  => $daten["user_id"],
+                            "user" => $daten["ov"].".".$daten["username"],
+                            "name" => $daten["vorname"]." ".$daten["name"],
+                            "mail" => $daten["email"]);
+        $this->data["grps"] = $this->getGroups($this->data["user"]);
+        
+        return true;
+    }
+    
+    function getGroups($user) {
+        if(empty($user)) {
+            return "";
+        }
+        
+        $return = "user";
+        
+        foreach(array("group1","group2") as $group) {
+            if(!empty($this->getConfig($group."_name")) && !empty($this->getConfig($group."_users"))) {
+                if(strpos($this->getConfig($group.'_users'),$user)!==false) {
+                    $return .= "," . $group;
+                }
+            }
+        }
+        
+        if(!empty($this->getConfig('admin_users'))) {
+            if(strpos($this->getConfig('admin_users'),$user)!==false) {
+                $return .= ",admin";
+            }
+        }
+        
+        return $return;
+    }
+    
+    function loadUserInfoFromSession() {
+        if(isset($_SESSION[DOKU_COOKIE]['auth']['hiorg'])) {
+            $data = $_SESSION[DOKU_COOKIE]['auth']['hiorg'];
+            if(empty($data)) {
+                return false;
+            } else {
+                return $data;
+            }
+        }
+        return false;
+    }
+    
+    function saveUserInfoToSession() {
+        $_SESSION[DOKU_COOKIE]['auth']['hiorg'] = $this->data;
+        return true;
+    }
+    
+    function setGlobalConfig() {
+        global $USERINFO;
+        $USERINFO['name'] = $this->data['name'];
+        $USERINFO['mail'] = $this->data['mail'];
+        $USERINFO['grps'] = $this->data['grps'];
+        $_SERVER['REMOTE_USER'] = $this->data['user'];
+        $_SESSION[DOKU_COOKIE]['auth']['user'] = $this->data['user'];
+        $_SESSION[DOKU_COOKIE]['auth']['pass'] = "";
+        $_SESSION[DOKU_COOKIE]['auth']['info'] = $USERINFO;
+        return true;
+    }
+    
     /**
      * Check user+password
      *
@@ -105,10 +169,10 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
      * @param   string $user the user name
      * @return  array containing user data or false
      */
-    public function getUserData($user) {
+    /*public function getUserData($user) {
         // FIXME implement
         return false;
-    }
+    }*/
 
     /**
      * Create a new User [implement only where required/possible]
