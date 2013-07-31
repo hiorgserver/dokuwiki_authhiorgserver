@@ -12,6 +12,7 @@ if(!defined('DOKU_INC')) die();
 class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
     
     private $ssourl = "";
+    private $myurl = "";
     private $data = array();
 
     /**
@@ -33,14 +34,17 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         $this->cando['logout']      = true; // can the user logout again? (eg. not possible with HTTP auth)
         $this->cando['external']    = true; // does the module do external auth checking?
         
-        $this->loadConfig();
+        // $this->loadConfig();
 
         $this->ssourl = $this->getConf('ssourl');
         $ov = $this->getConf('ov');
         if(!empty($ov)) {
-            $sep = (strpos($this->ssourl,"?") === false) ? "?" : "&";
-            $this->ssourl .= $sep . "ov=" . $ov;
+            $this->ssourl = $this->addurlparams($this->ssourl,array("ov"=>$ov));
         }
+
+        global $ID;
+        $this->myurl = wl($ID, '', true, '&');
+        
         $this->data = array();
         
         $this->success = true;
@@ -51,12 +55,12 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
      * Log off the current user [ OPTIONAL ]
      */
     public function logOff() {
+        $url = $this->addurlparams($this->ssourl,array("logout"=>1,"token"=>$this->data["token"],"weiter"=> $this->myurl));
+
         $this->data = array();
         unset($_SESSION[DOKU_COOKIE]['auth']['hiorg']);
-        
-        parent::logOff();
-        
-        // FIXME implement
+
+        send_redirect($url);
     }
 
     /**
@@ -69,14 +73,13 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
      */
     public function trustExternal($user, $pass, $sticky = false) {
         
-        $this->data = $this->loadUserInfoFromSession();
-        
-        if (!empty($this->data)) {
+        if ($this->loadUserInfoFromSession()) {
             $this->setGlobalConfig();
-            return;
+            return true;
         }
         
-        if($_GET["do"]=="login") {
+        global $ACT;
+        if($ACT == "login") {
             $this->processSSO();
         
             $this->setGlobalConfig();
@@ -85,16 +88,35 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         
         return true;
     }
-
+    
     function processSSO() {
         
-        // FIXME: ask hiorg-server...
-        $daten = array("name"=>"Hansi", "vorname"=>"Tester", "username"=>"admin", "email"=>"test@test.de", "user_id"=>"abcde12345", "ov"=>"xxx");
+        if(empty($_GET["token"])) { // noch kein gueltiges Token vom HiOrg-Server erhalten
+            $ziel = $this->addurlparams($this->ssourl,array("weiter"=> $this->addurlparams($this->myurl,array("do"=>"login")),
+                                                            "getuserinfo"=>"name,vorname,username,email,user_id"));
+            send_redirect($ziel);
+        } 
+        // Token vom HiOrg-Server erhalten: jetzt Login ueberpruefen und Nutzerdaten abfragen
+        $token = $_GET["token"];
+
+        $url = $this->addurlparams($this->ssourl,array("token"=>$token));
+//        die("Url abrufen: ".hsc($url));
+        $daten = $this->geturl($url);
+//        die("Daten erhalten: $daten");
+        
+        if(mb_substr( $daten ,0,2) != "OK") nice_die("Login beim HiOrg-Server fehlgeschlagen!");
+        $daten = unserialize(base64_decode(mb_substr( $daten , 3)));
+
+        $ov = $this->getConf('ov');
+        if( !empty($ov) && ($daten["ov"] != $ov) ) nice_die("Falsches Organisationskuerzel: ".$daten["ov"]. ", erwartet: ".$ov);
+
+        // $daten = array("name"=>"Hansi", "vorname"=>"Tester", "username"=>"admin", "email"=>"test@test.de", "user_id"=>"abcde12345", "ov"=>"xxx");
         
         $this->data = array("uid"  => $daten["user_id"],
                             "user" => $this->cleanUser($daten["ov"].".".$daten["username"]),
                             "name" => $daten["vorname"]." ".$daten["name"],
-                            "mail" => $daten["email"]);
+                            "mail" => $daten["email"],
+                            "token"=> $token);
         $this->data["grps"] = $this->getGroups($this->data["user"]);
         
         return true;
@@ -123,18 +145,22 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
     function loadUserInfoFromSession() {
         if(isset($_SESSION[DOKU_COOKIE]['auth']['hiorg'])) {
             $data = $_SESSION[DOKU_COOKIE]['auth']['hiorg'];
-            if(empty($data)) {
+            if(empty($data) || !is_array($data) || empty($data["token"])) {
                 return false;
             } else {
-                return $data;
+                $this->data = $data;
+                return true;
             }
         }
         return false;
     }
     
     function saveUserInfoToSession() {
-        $_SESSION[DOKU_COOKIE]['auth']['hiorg'] = $this->data;
-        return true;
+        if(!empty($this->data["token"])) {
+            $_SESSION[DOKU_COOKIE]['auth']['hiorg'] = $this->data;
+            return true;
+        }
+        return false;
     }
     
     function setGlobalConfig() {
@@ -149,6 +175,62 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         return true;
     }
     
+    function addurlparams($url, $params) {
+        if(!is_array($params) || empty($params)) return $url;
+
+        $parary = array();
+        $p = strpos($url,"?");
+        if($p!==false) {
+            foreach(explode("&",substr($url,$p+1)) as $par) {
+                $q = strpos($par,"=");
+                $parary[substr($par,0,$q)] = substr($par,$q+1);
+            }
+            $url = substr($url,0,$p);
+        }
+        
+        foreach($params as $par => $val) {
+            $parary[rawurlencode($par)] = rawurlencode($val);
+        }
+        
+        $ret = $url;
+        $sep = "?";
+        foreach($parary as $par => $val) {
+            $ret .= $sep . $par . "=" . $val;
+            $sep = "&";
+        }
+        return $ret;
+    }
+    
+    function geturl($url) {
+        
+        $http = new DokuHTTPClient();
+        $daten = $http->get($url);
+        if(!empty($daten)) {
+            return $daten;
+        }
+        
+        // Workarounds:
+        if(function_exists("curl_init")) {
+            $ch = curl_init($url);
+            curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
+            curl_setopt($ch,CURLOPT_SSL_VERIFYPEER,false);
+            $daten = curl_exec($ch);
+            curl_close($ch);
+            
+        } else {
+            if (!ini_get("allow_url_fopen") && version_compare(phpversion(), "4.3.4", "<=")) {
+                ini_set("allow_url_fopen", "1");
+            }
+            if ($fp = @fopen($url, "r")) {
+                $daten = "";
+                while (!feof($fp)) $daten.= fread($fp, 1024);
+                fclose($fp);
+            }
+        }
+        
+        return $daten;
+    }
+
     /**
      * Check user+password
      *

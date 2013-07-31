@@ -5,7 +5,7 @@
  * @author HiOrg Server GmbH <support@hiorg-server.de>
  */
 
-$conf['ov']    = ''; // Organisationskuerzel
+$conf['ov']    = 'xxx'; // Organisationskuerzel
 $conf['ssourl'] = 'https://www.hiorg-server.de/logmein.php';
 
 $conf['admin_users'] = 'xxx.admin';
