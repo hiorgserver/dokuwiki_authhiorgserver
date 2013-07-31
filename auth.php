@@ -34,14 +34,15 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         $this->cando['logout']      = true; // can the user logout again? (eg. not possible with HTTP auth)
         $this->cando['external']    = true; // does the module do external auth checking?
         
-        // $this->loadConfig();
+        // $this->loadConfig(); // deprecated seit 2012
 
         $this->ssourl = $this->getConf('ssourl');
         $ov = $this->getConf('ov');
         if(!empty($ov)) {
-            $this->ssourl = $this->addurlparams($this->ssourl,array("ov"=>$ov));
+            $this->ssourl = $this->addUrlParams($this->ssourl,array("ov"=>$ov));
         }
 
+        // aktuelle Seite merken, um nach externem Login wieder hierher zu redirecten
         global $ID;
         $this->myurl = wl($ID, '', true, '&');
         
@@ -52,10 +53,10 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
 
 
     /**
-     * Log off the current user [ OPTIONAL ]
+     * Log off the current user 
      */
     public function logOff() {
-        $url = $this->addurlparams($this->ssourl,array("logout"=>1,"token"=>$this->data["token"],"weiter"=> $this->myurl));
+        $url = $this->addUrlParams($this->ssourl,array("logout"=>1,"token"=>$this->data["token"],"weiter"=> $this->myurl));
 
         $this->data = array();
         unset($_SESSION[DOKU_COOKIE]['auth']['hiorg']);
@@ -64,7 +65,7 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
     }
 
     /**
-     * Do all authentication [ OPTIONAL ]
+     * Do all authentication 
      *
      * @param   string  $user    Username
      * @param   string  $pass    Cleartext Password
@@ -91,22 +92,23 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
     
     function processSSO() {
         
-        if(empty($_GET["token"])) { // noch kein gueltiges Token vom HiOrg-Server erhalten
-            $ziel = $this->addurlparams($this->ssourl,array("weiter"=> $this->addurlparams($this->myurl,array("do"=>"login")),
+        // 1. Schritt: noch kein gueltiges Token vom HiOrg-Server erhalten
+        if(empty($_GET["token"])) { 
+            $ziel = $this->addUrlParams($this->ssourl,array("weiter"=> $this->addUrlParams($this->myurl,array("do"=>"login")), // do=login, damit wir für den 2. Schritt wieder hier landen
                                                             "getuserinfo"=>"name,vorname,username,email,user_id"));
             send_redirect($ziel);
         } 
-        // Token vom HiOrg-Server erhalten: jetzt Login ueberpruefen und Nutzerdaten abfragen
+        
+        // 2. Schritt: Token vom HiOrg-Server erhalten: jetzt Login ueberpruefen und Nutzerdaten abfragen
         $token = $_GET["token"];
 
-        $url = $this->addurlparams($this->ssourl,array("token"=>$token));
-//        die("Url abrufen: ".hsc($url));
-        $daten = $this->geturl($url);
-//        die("Daten erhalten: $daten");
+        $url = $this->addUrlParams($this->ssourl,array("token"=>$token));
+        $daten = $this->getUrl($url);
         
         if(mb_substr( $daten ,0,2) != "OK") nice_die("Login beim HiOrg-Server fehlgeschlagen!");
         $daten = unserialize(base64_decode(mb_substr( $daten , 3)));
 
+        // wenn per Konfig auf eine Organisation festgelegt, Cross-Logins abfangen:
         $ov = $this->getConf('ov');
         if( !empty($ov) && ($daten["ov"] != $ov) ) nice_die("Falsches Organisationskuerzel: ".$daten["ov"]. ", erwartet: ".$ov);
 
@@ -128,13 +130,15 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         }
         
         global $conf;
-        $return = array($conf["defaultgroup"]);
+        $return = array($this->cleanGroup($conf["defaultgroup"]));
         
-        foreach(array("group1"=>$this->getConf("group1_name"),"group2"=>$this->getConf("group2_name"),"admin"=>"admin") as $name => $group) {
+        foreach(array("group1"=>$this->getConf("group1_name"),
+                      "group2"=>$this->getConf("group2_name"),
+                      "admin" =>"admin") as $name => $group) {
             $users = $this->getConf($group."_users");
             if(!empty($name) && !empty($users)) {
                 if(strpos($users,$user)!==false) {
-                    $return[] = $group;
+                    $return[] = $this->cleanGroup($group);
                 }
             }
         }
@@ -175,7 +179,14 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         return true;
     }
     
-    function addurlparams($url, $params) {
+    /**
+     * Helper: builds URL by adding parameters
+     *
+     * @param   string $url URL
+     * @param   array $params additional parameters
+     * @return  string
+     */
+    function addUrlParams($url, $params) {
         if(!is_array($params) || empty($params)) return $url;
 
         $parary = array();
@@ -201,48 +212,39 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         return $ret;
     }
     
-    function geturl($url) {
-        
+    /**
+     * Helper: fetches external URL via GET
+     *
+     * @param   string $url URL
+     * @return  string
+     */
+    function getUrl($url) {
         $http = new DokuHTTPClient();
         $daten = $http->get($url);
-        if(!empty($daten)) {
-            return $daten;
-        }
         
-        // Workarounds:
-        if(function_exists("curl_init")) {
-            $ch = curl_init($url);
-            curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
-            curl_setopt($ch,CURLOPT_SSL_VERIFYPEER,false);
-            $daten = curl_exec($ch);
-            curl_close($ch);
+        // Workarounds, o.g. Klasse macht manchmal Probleme:
+        if(empty($daten)) {
+            if(function_exists("curl_init")) {
+                $ch = curl_init($url);
+                curl_setopt($ch,CURLOPT_RETURNTRANSFER,1);
+                curl_setopt($ch,CURLOPT_SSL_VERIFYPEER,false);
+                $daten = curl_exec($ch);
+                curl_close($ch);
             
-        } else {
-            if (!ini_get("allow_url_fopen") && version_compare(phpversion(), "4.3.4", "<=")) {
-                ini_set("allow_url_fopen", "1");
-            }
-            if ($fp = @fopen($url, "r")) {
-                $daten = "";
-                while (!feof($fp)) $daten.= fread($fp, 1024);
-                fclose($fp);
+            } else {
+                if (!ini_get("allow_url_fopen") && version_compare(phpversion(), "4.3.4", "<=")) {
+                    ini_set("allow_url_fopen", "1");
+                }
+                if ($fp = @fopen($url, "r")) {
+                    $daten = "";
+                    while (!feof($fp)) $daten.= fread($fp, 1024);
+                    fclose($fp);
+                }
             }
         }
         
         return $daten;
     }
-
-    /**
-     * Check user+password
-     *
-     * May be ommited if trustExternal is used.
-     *
-     * @param   string $user the user name
-     * @param   string $pass the clear text password
-     * @return  bool
-     */
-    /* public function checkPass($user, $pass) {
-        return false; // return true if okay
-    } */
 
     /**
      * Return user info
@@ -262,55 +264,6 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         return false;
     }*/
 
-    /**
-     * Create a new User [implement only where required/possible]
-     *
-     * Returns false if the user already exists, null when an error
-     * occurred and true if everything went well.
-     *
-     * The new user HAS TO be added to the default group by this
-     * function!
-     *
-     * Set addUser capability when implemented
-     *
-     * @param  string     $user
-     * @param  string     $pass
-     * @param  string     $name
-     * @param  string     $mail
-     * @param  null|array $grps
-     * @return bool|null
-     */
-    //public function createUser($user, $pass, $name, $mail, $grps = null) {
-        // FIXME implement
-    //    return null;
-    //}
-
-    /**
-     * Modify user data [implement only where required/possible]
-     *
-     * Set the mod* capabilities according to the implemented features
-     *
-     * @param   string $user    nick of the user to be changed
-     * @param   array  $changes array of field/value pairs to be changed (password will be clear text)
-     * @return  bool
-     */
-    //public function modifyUser($user, $changes) {
-        // FIXME implement
-    //    return false;
-    //}
-
-    /**
-     * Delete one or more users [implement only where required/possible]
-     *
-     * Set delUser capability when implemented
-     *
-     * @param   array  $users
-     * @return  int    number of users deleted
-     */
-    //public function deleteUsers($users) {
-        // FIXME implement
-    //    return false;
-    //}
 
     /**
      * Bulk retrieval of user data [implement only where required/possible]
@@ -339,19 +292,6 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
     //public function getUserCount($filter = array()) {
         // FIXME implement
     //    return 0;
-    //}
-
-    /**
-     * Define a group [implement only where required/possible]
-     *
-     * Set addGroup capability when implemented
-     *
-     * @param   string $group
-     * @return  bool
-     */
-    //public function addGroup($group) {
-        // FIXME implement
-    //    return false;
     //}
 
     /**
@@ -412,7 +352,8 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
      * @return string the cleaned groupname
      */
     public function cleanGroup($group) {
-        return $group;
+        global $conf;
+        return cleanID(str_replace(':', $conf['sepchar'], $group));
     }
 
     /**
