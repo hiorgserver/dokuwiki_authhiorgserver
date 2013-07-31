@@ -6,10 +6,10 @@
  */
 
 $conf['ov']    = ''; // Organisationskuerzel
-$conv['ssourl'] = 'https://www.hiorg-server.de/logmein.php';
+$conf['ssourl'] = 'https://www.hiorg-server.de/logmein.php';
 
-$conv['admin_users'] = '';
-$conv['group1_name'] = '';
-$conv['group1_users'] = '';
-$conv['group2_name'] = '';
-$conv['group2_users'] = '';
+$conf['admin_users'] = 'xxx.admin';
+$conf['group1_name'] = '';
+$conf['group1_users'] = '';
+$conf['group2_name'] = '';
+$conf['group2_users'] = '';

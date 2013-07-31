@@ -1,7 +1,7 @@
 base   authhiorgserver
 author HiOrg Server GmbH
 email  support@hiorg-server.de
-date   2013-07-30
+date   2013-07-31
 name   authhiorgserver plugin
 desc   uses HiOrg-Server as Auth-Provider (SSO)
 url    https://github.com/hiorgserver/dokuwiki_authhiorgserver/archive/master.zip

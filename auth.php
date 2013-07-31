@@ -32,6 +32,8 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         $this->cando['getGroups']   = false; // can a list of available groups be retrieved?
         $this->cando['logout']      = true; // can the user logout again? (eg. not possible with HTTP auth)
         $this->cando['external']    = true; // does the module do external auth checking?
+        
+        $this->loadConfig();
 
         $this->ssourl = $this->getConf('ssourl');
         $ov = $this->getConf('ov');
@@ -49,6 +51,11 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
      * Log off the current user [ OPTIONAL ]
      */
     public function logOff() {
+        $this->data = array();
+        unset($_SESSION[DOKU_COOKIE]['auth']['hiorg']);
+        
+        parent::logOff();
+        
         // FIXME implement
     }
 
@@ -69,20 +76,23 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
             return;
         }
         
-        $this->processSSO();
+        if($_GET["do"]=="login") {
+            $this->processSSO();
         
-        $this->setGlobalConfig();
-        $this->saveUserInfoToSession();
+            $this->setGlobalConfig();
+            $this->saveUserInfoToSession();
+        }
         
         return true;
     }
 
     function processSSO() {
+        
         // FIXME: ask hiorg-server...
-        $daten = array("name"=>"Hansi", "vorname"=>"Tester", "username"=>"loginname", "email"=>"test@test.de", "user_id"=>"abcde12345", "ov"=>"hos");
+        $daten = array("name"=>"Hansi", "vorname"=>"Tester", "username"=>"admin", "email"=>"test@test.de", "user_id"=>"abcde12345", "ov"=>"xxx");
         
         $this->data = array("uid"  => $daten["user_id"],
-                            "user" => $daten["ov"].".".$daten["username"],
+                            "user" => $this->cleanUser($daten["ov"].".".$daten["username"]),
                             "name" => $daten["vorname"]." ".$daten["name"],
                             "mail" => $daten["email"]);
         $this->data["grps"] = $this->getGroups($this->data["user"]);
@@ -95,19 +105,15 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
             return "";
         }
         
-        $return = "user";
+        global $conf;
+        $return = array($conf["defaultgroup"]);
         
-        foreach(array("group1","group2") as $group) {
-            if(!empty($this->getConfig($group."_name")) && !empty($this->getConfig($group."_users"))) {
-                if(strpos($this->getConfig($group.'_users'),$user)!==false) {
-                    $return .= "," . $group;
+        foreach(array("group1"=>$this->getConf("group1_name"),"group2"=>$this->getConf("group2_name"),"admin"=>"admin") as $name => $group) {
+            $users = $this->getConf($group."_users");
+            if(!empty($name) && !empty($users)) {
+                if(strpos($users,$user)!==false) {
+                    $return[] = $group;
                 }
-            }
-        }
-        
-        if(!empty($this->getConfig('admin_users'))) {
-            if(strpos($this->getConfig('admin_users'),$user)!==false) {
-                $return .= ",admin";
             }
         }
         
@@ -304,10 +310,11 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
      * @param string $user username
      * @return string the cleaned username
      */
-    public function cleanUser($user) {
-        return $user;
-    }
 
+    public function cleanUser($user) {
+        global $conf;
+        return cleanID(str_replace(':', $conf['sepchar'], $user));
+    }
     /**
      * Sanitize a given groupname
      *
