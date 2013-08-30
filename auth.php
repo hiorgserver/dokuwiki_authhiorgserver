@@ -14,6 +14,8 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
     private $ssourl = "";
     private $myurl = "";
     private $data = array();
+    private $triedsilent = false;
+    private $usersepchar = "@";
 
     /**
      * Constructor.
@@ -48,6 +50,9 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         
         $this->data = array();
         
+        $this->triedsilent = (isset($_SESSION[DOKU_COOKIE]['auth']['hiorg']['triedsilent'])
+                              && ($_SESSION[DOKU_COOKIE]['auth']['hiorg']['triedsilent'] == true));
+        
         $this->success = true;
     }
 
@@ -59,7 +64,7 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         $url = $this->addUrlParams($this->ssourl,array("logout"=>1,"token"=>$this->data["token"],"weiter"=> $this->myurl));
 
         $this->data = array();
-        unset($_SESSION[DOKU_COOKIE]['auth']['hiorg']);
+        $_SESSION[DOKU_COOKIE]['auth']['hiorg'] = array("triedsilent"=>true);
 
         send_redirect($url);
     }
@@ -85,6 +90,10 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         
             $this->setGlobalConfig();
             $this->saveUserInfoToSession();
+            
+        } elseif(!$this->triedsilent) {
+            $_SESSION[DOKU_COOKIE]['auth']['hiorg']['triedsilent'] = $this->triedsilent = true;
+            $this->SSOsilent();
         }
         
         return true;
@@ -115,7 +124,7 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         // $daten = array("name"=>"Hansi", "vorname"=>"Tester", "username"=>"admin", "email"=>"test@test.de", "user_id"=>"abcde12345", "ov"=>"xxx");
         
         $this->data = array("uid"  => $daten["user_id"],
-                            "user" => $this->cleanUser($daten["ov"].".".$daten["username"]),
+                            "user" => $this->buildUser($daten["username"],$daten["ov"]),
                             "name" => $daten["vorname"]." ".$daten["name"],
                             "mail" => $daten["email"],
                             "token"=> $token);
@@ -124,10 +133,19 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         return true;
     }
     
+    function SSOsilent() {
+        $ziel = $this->addUrlParams($this->ssourl, array("weiter"      => $this->addUrlParams($this->myurl,array("do"=>"login")), // do=login, damit wir für den 2. Schritt wieder hier landen
+                                                         "getuserinfo" => "name,vorname,username,email,user_id",
+                                                         "silent"      => $this->myurl));
+        send_redirect($ziel);
+    }
+    
     function getGroups($user) {
         if(empty($user)) {
             return "";
         }
+        
+        $ov = trim($this->getConf("ov"));
         
         global $conf;
         $return = array($this->cleanGroup($conf["defaultgroup"]));
@@ -137,6 +155,16 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
                       "admin" =>"admin") as $name => $group) {
             $users = $this->getConf($group."_users");
             if(!empty($name) && !empty($users)) {
+                if(!empty($ov)) { // ov automatisch ergänzen, wenn bekannt und nicht genannt
+                    $userary = explode(",",$users);
+                    $users = "";
+                    foreach($userary as $u) {
+                        if(strpos($u,$this->usersepchar)===false) {
+                            $u = $this->buildUser($u, $ov);
+                        }
+                        $users .= "," . $u;
+                    }
+                }
                 if(strpos($users,$user)!==false) {
                     $return[] = $this->cleanGroup($group);
                 }
@@ -144,6 +172,13 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         }
         
         return $return;
+    }
+    
+    function buildUser($user, $ov="") {
+        if(empty($ov)) {
+            $ov = trim($this->getConf("ov"));
+        }
+        return $this->cleanUser($user . $this->usersepchar . $ov);
     }
     
     function loadUserInfoFromSession() {
