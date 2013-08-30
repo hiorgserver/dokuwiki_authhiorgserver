@@ -150,11 +150,13 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         global $conf;
         $return = array($this->cleanGroup($conf["defaultgroup"]));
         
-        foreach(array("group1"=>$this->getConf("group1_name"),
-                      "group2"=>$this->getConf("group2_name"),
-                      "admin" =>"admin") as $name => $group) {
-            $users = $this->getConf($group."_users");
-            if(!empty($name) && !empty($users)) {
+        $groups = array("group1"=>$this->getConf("group1_name"),
+                        "group2"=>$this->getConf("group2_name"),
+                        "admin" =>"admin");
+        
+        foreach($groups as $name => $group) {
+            $users = $this->getConf($name."_users");
+            if(!empty($group) && !empty($users)) {
                 if(!empty($ov)) { // ov automatisch ergänzen, wenn bekannt und nicht genannt
                     $userary = explode(",",$users);
                     $users = "";
@@ -170,7 +172,7 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
                 }
             }
         }
-        
+
         return $return;
     }
     
