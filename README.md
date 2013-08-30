@@ -1,28 +1,36 @@
 dokuwiki_authhiorgserver
 ========================
 
-Plugin for DokuWiki: Single-Sign-On mit HiOrg-Server (http://www.hiorg-server.de)
+DokuWiki Plugin: Single-Sign-On mit HiOrg-Server (http://www.hiorg-server.de)
 
 Anleitung zur Installation
 --------------------------
 
-0) Erstellen Sie vorab (per FTP) eine Sicherungskopie der Dokuwiki-Einstellungen
-  .../conf/local.php
+1.  Erstellen Sie vorab (per FTP) eine Sicherungskopie der Dokuwiki-Einstellungen  
+    .../conf/local.php
 
-1) Installieren Sie das Plugin über den Plugin-Manager, Quell-URL: 
-  https://github.com/hiorgserver/dokuwiki_authhiorgserver/archive/master.zip
+2.  Installieren Sie das Plugin über den Plugin-Manager, Quell-URL:  
+    https://github.com/hiorgserver/dokuwiki_authhiorgserver/archive/master.zip
 
-2) Setzen Sie zuerst die Einstellungen des Plugins in Ihrem Wiki unter
-  Admin -> Konfiguration -> Plugins: Auth: SSO mit HiOrg-Server
-  ACHTUNG: lassen Sie zunächst den "Authentifizierungsmechanismus" (weiter oben, Abschnitt "Authentifizierungs-Konfig") noch auf der vorherigen Einstellung bestehen!
+3.  Setzen Sie zuerst die Einstellungen des Plugins in Ihrem Wiki unter  
+    Admin -> Konfiguration -> Plugins: Auth: SSO mit HiOrg-Server
 
-  Geben Sie im Feld "Organisationskürzel" das Org.-Kürzel Ihres HiOrg-Server ein (3-4 Kleinbuchstaben). Tragen Sie im Feld "Admins" Ihren Benutzernamen beim HiOrg-Server ein.
+    ACHTUNG: lassen Sie zunächst den "Authentifizierungsmechanismus" (weiter 
+oben, Abschnitt "Authentifizierungs-Konfig") noch auf der vorherigen 
+Einstellung bestehen!
 
-3) Klicken Sie jetzt ganz unten auf [Speichern], um die Einstellungen des Plugins zu sichern.
+    Geben Sie im Feld "Organisationskürzel" das Org.-Kürzel Ihres HiOrg-Server 
+ein (3-4 Kleinbuchstaben). Tragen Sie im Feld "Admins" Ihren Benutzernamen beim 
+HiOrg-Server ein.
 
-4) Stellen Sie JETZT ERST im Abschnitt "Authentifizierungs-Konfig - Authentifizierungsmechanismus (authtype) um auf "authhiorgserver" und klicken erneut auf [Speichern].
+4.  Klicken Sie jetzt ganz unten auf [Speichern], um die Einstellungen des 
+Plugins zu sichern.
 
+5.  Stellen Sie ERST JETZT im Abschnitt "Authentifizierungs-Konfig - 
+Authentifizierungsmechanismus (authtype)" um auf "authhiorgserver" und klicken 
+erneut auf [Speichern].
 
+----
 All documentation for this plugin can be found at
 https://github.com/hiorgserver/dokuwiki_authhiorgserver
 

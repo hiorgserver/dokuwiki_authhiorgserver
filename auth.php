@@ -178,7 +178,7 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         if(empty($ov)) {
             $ov = trim($this->getConf("ov"));
         }
-        return $this->cleanUser($user . $this->usersepchar . $ov);
+        return $this->cleanUser($user) . $this->usersepchar . $this->cleanUser($ov);
     }
     
     function loadUserInfoFromSession() {
