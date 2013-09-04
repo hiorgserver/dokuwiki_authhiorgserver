@@ -12,7 +12,6 @@ if(!defined('DOKU_INC')) die();
 class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
     
     private $ssourl = "";
-    private $myurl = "";
     private $data = array();
     private $triedsilent = false;
     private $usersepchar = "@";
@@ -44,10 +43,6 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
             $this->ssourl = $this->addUrlParams($this->ssourl,array("ov"=>$ov));
         }
 
-        // aktuelle Seite merken, um nach externem Login wieder hierher zu redirecten
-        global $ID;
-        $this->myurl = wl($ID, '', true, '&');
-        
         $this->data = array();
         
         $this->triedsilent = (isset($_SESSION[DOKU_COOKIE]['auth']['hiorg']['triedsilent'])
@@ -61,7 +56,7 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
      * Log off the current user 
      */
     public function logOff() {
-        $url = $this->addUrlParams($this->ssourl,array("logout"=>1,"token"=>$this->data["token"],"weiter"=> $this->myurl));
+        $url = $this->addUrlParams($this->ssourl,array("logout"=>1,"token"=>$this->data["token"],"weiter"=> $this->myUrl()));
 
         $this->data = array();
         $_SESSION[DOKU_COOKIE]['auth']['hiorg'] = array("triedsilent"=>true);
@@ -99,11 +94,17 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         return true;
     }
     
+    function myUrl($urlParameters = '') {
+        // global $ID;  // ist zu diesem Zeitpunkt noch nicht initialisiert
+        $ID = getID();
+        return wl($ID, $urlParameters, true, '&');
+    }
+    
     function processSSO() {
         
         // 1. Schritt: noch kein gueltiges Token vom HiOrg-Server erhalten
         if(empty($_GET["token"])) { 
-            $ziel = $this->addUrlParams($this->ssourl,array("weiter"=> $this->addUrlParams($this->myurl,array("do"=>"login")), // do=login, damit wir für den 2. Schritt wieder hier landen
+            $ziel = $this->addUrlParams($this->ssourl,array("weiter"=> $this->myUrl(array("do"=>"login")), // do=login, damit wir für den 2. Schritt wieder hier landen
                                                             "getuserinfo"=>"name,vorname,username,email,user_id"));
             send_redirect($ziel);
         } 
@@ -134,9 +135,9 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
     }
     
     function SSOsilent() {
-        $ziel = $this->addUrlParams($this->ssourl, array("weiter"      => $this->addUrlParams($this->myurl,array("do"=>"login")), // do=login, damit wir für den 2. Schritt wieder hier landen
+        $ziel = $this->addUrlParams($this->ssourl, array("weiter"      => $this->myUrl(array("do"=>"login")), // do=login, damit wir für den 2. Schritt wieder hier landen
                                                          "getuserinfo" => "name,vorname,username,email,user_id",
-                                                         "silent"      => $this->myurl));
+                                                         "silent"      => $this->myUrl()));
         send_redirect($ziel);
     }
     
