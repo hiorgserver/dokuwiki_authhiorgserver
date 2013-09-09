@@ -13,3 +13,4 @@ $meta['group1_name'] = array('string');
 $meta['group1_users'] = array('string');
 $meta['group2_name'] = array('string');
 $meta['group2_users'] = array('string');
+$meta['syncname'] = array('multichoice','_choices' => array('all','vname','vona','vn'));

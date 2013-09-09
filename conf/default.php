@@ -13,3 +13,5 @@ $conf['group1_name'] = '';
 $conf['group1_users'] = '';
 $conf['group2_name'] = '';
 $conf['group2_users'] = '';
+
+$conf['syncname'] = 'all';

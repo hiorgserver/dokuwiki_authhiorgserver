@@ -126,7 +126,7 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         
         $this->data = array("uid"  => $daten["user_id"],
                             "user" => $this->buildUser($daten["username"],$daten["ov"]),
-                            "name" => $daten["vorname"]." ".$daten["name"],
+                            "name" => $this->buildName($daten["vorname"], $daten["name"]),
                             "mail" => $daten["email"],
                             "token"=> $token);
         $this->data["grps"] = $this->getGroups($this->data["user"]);
@@ -182,6 +182,19 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
             $ov = trim($this->getConf("ov"));
         }
         return $this->cleanUser($user) . $this->usersepchar . $this->cleanUser($ov);
+    }
+    
+    function buildName($vorname, $name) {
+        switch ($this->getConf('syncname')) {
+            case 'vname':
+                return substr($vorname,0,1).". ".$name;
+            case 'vona':
+                return substr($vorname,0,2).substr($name,0,2);
+            case 'vn':
+                return substr($vorname,0,1).substr($name,0,1);
+            default:
+                return $vorname." ".$name;
+        }
     }
     
     function loadUserInfoFromSession() {
