@@ -1,0 +1,22 @@
+{
+    "name": "hiorgserver/dokuwiki_authhiorgserver",
+    "description": "DokuWiki Plugin: Single-Sign-On mit HiOrg-Server",
+    "homepage": "http://www.hiorg-server.de",
+    "license": "GPL-2.0",
+    "authors": [
+        {
+            "name": "HiOrg Server GmbH",
+            "email": "support@hiorg-server.de",
+            "homepage": "http://www.hiorg-server.de"
+        }
+    ],
+    "support": {
+        "email": "support@hiorg-server.de",
+        "forum": "http://forum.hiorg-server.de"
+    },
+    
+    "type": "dokuwiki-plugin",
+    "require": {
+        "composer/installers": ">1.0.18"
+    }
+}
