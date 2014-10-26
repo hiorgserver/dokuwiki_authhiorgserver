@@ -7,7 +7,9 @@
  */
 
 // must be run within Dokuwiki
-if(!defined('DOKU_INC')) die();
+if(!defined('DOKU_INC')) {
+    die();
+}
 
 class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
     
@@ -115,12 +117,16 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
         $url = $this->addUrlParams($this->ssourl,array("token"=>$token));
         $daten = $this->getUrl($url);
         
-        if(mb_substr( $daten ,0,2) != "OK") nice_die("Login beim HiOrg-Server fehlgeschlagen!");
+        if(mb_substr( $daten ,0,2) != "OK") {
+            nice_die("Login beim HiOrg-Server fehlgeschlagen!");
+        }
         $daten = unserialize(base64_decode(mb_substr( $daten , 3)));
 
         // wenn per Konfig auf eine Organisation festgelegt, Cross-Logins abfangen:
         $ov = $this->getConf('ov');
-        if( !empty($ov) && ($daten["ov"] != $ov) ) nice_die("Falsches Organisationskuerzel: ".$daten["ov"]. ", erwartet: ".$ov);
+        if( !empty($ov) && ($daten["ov"] != $ov) ) {
+            nice_die("Falsches Organisationskuerzel: ".$daten["ov"]. ", erwartet: ".$ov);
+        }
 
         // $daten = array("name"=>"Hansi", "vorname"=>"Tester", "username"=>"admin", "email"=>"test@test.de", "user_id"=>"abcde12345", "ov"=>"xxx");
         
@@ -238,7 +244,9 @@ class auth_plugin_authhiorgserver extends DokuWiki_Auth_Plugin {
      * @return  string
      */
     function addUrlParams($url, $params) {
-        if(!is_array($params) || empty($params)) return $url;
+        if(!is_array($params) || empty($params)) {
+            return $url;
+        }
 
         $parary = array();
         $p = strpos($url,"?");
